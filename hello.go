@@ -38,12 +38,12 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && len(ids[0]) >= 1 {
 
 			key := ids[0]
-			var podcast bson.M
-			err := collectionUsers.FindOne(ctx, bson.M{"id": key}).Decode(&podcast)
+			var data bson.M
+			err := collectionUsers.FindOne(ctx, bson.M{"id": key}).Decode(&data)
 			if err != nil {
 				panic(err)
 			} else {
-				fmt.Println(podcast["name"])
+				fmt.Println(data["name"])
 			}
 
 		}
@@ -57,9 +57,10 @@ func posts(w http.ResponseWriter, r *http.Request) {
 			caption := r.FormValue("caption")
 			url := r.FormValue("url")
 			timestamp := r.FormValue("timestamp")
+			userId := r.FormValue("userId")
 			var document interface{}
 			document = bson.D{
-				{"id", id}, {"caption", caption}, {"url", url}, {"timestamp", timestamp}}
+				{"id", id}, {"caption", caption}, {"url", url}, {"timestamp", timestamp}, {"userId", userId}}
 
 			res, err := collectionPosts.InsertOne(ctx, document)
 			if err != nil {
@@ -70,12 +71,12 @@ func posts(w http.ResponseWriter, r *http.Request) {
 	} else {
 		if r.Method == "GET" && ids != nil {
 			key := ids[0]
-			var podcast bson.M
-			err := collectionPosts.FindOne(ctx, bson.M{"id": key}).Decode(&podcast)
+			var data bson.M
+			err := collectionPosts.FindOne(ctx, bson.M{"id": key}).Decode(&data)
 			if err != nil {
 				panic(err)
 			} else {
-				fmt.Println(podcast["caption"])
+				fmt.Println(data["caption"])
 			}
 		}
 	}
@@ -83,7 +84,18 @@ func posts(w http.ResponseWriter, r *http.Request) {
 func getAllPosts(w http.ResponseWriter, r *http.Request) {
 	ids, ok := r.URL.Query()["id"]
 	if ok && r.Method == "GET" && ids != nil {
-
+		key := ids[0]
+		var data []bson.M
+		cursor, err := collectionPosts.Find(ctx, bson.M{"userId": key})
+		if err != nil {
+			panic(err)
+		} else {
+			err = cursor.All(ctx, &data)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(data)
+		}
 	}
 }
 func handleRequests() {
