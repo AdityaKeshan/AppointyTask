@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -15,78 +16,87 @@ import (
 var collectionUsers *mongo.Collection
 var collectionPosts *mongo.Collection
 var ctx context.Context
+var lock sync.Mutex
 
 func homePage(w http.ResponseWriter, r *http.Request) {
-	ids, ok := r.URL.Query()["id"]
-	if !ok {
-		if r.Method == "POST" && ids == nil {
-			id := r.FormValue("id")
-			name := r.FormValue("name")
-			email := r.FormValue("email")
-			password := r.FormValue("password")
-			var document interface{}
-			document = bson.D{
-				{"id", id}, {"name", name}, {"email", email}, {"password", password}}
+	lock.Lock()
+	var val string
+	para := r.URL.Path
+	if len(para) > 6 {
+		val = para[7:]
+	}
+	if r.Method == "POST" && val == "" {
+		id := r.FormValue("id")
+		name := r.FormValue("name")
+		email := r.FormValue("email")
+		password := r.FormValue("password")
+		var document interface{}
+		document = bson.D{
+			{"id", id}, {"name", name}, {"email", email}, {"password", password}}
 
-			res, err := collectionUsers.InsertOne(ctx, document)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Println(res.InsertedID)
+		res, err := collectionUsers.InsertOne(ctx, document)
+		if err != nil {
+			panic(err)
 		}
-	} else {
-		if r.Method == "GET" && len(ids[0]) >= 1 {
-
-			key := ids[0]
-			var data bson.M
-			err := collectionUsers.FindOne(ctx, bson.M{"id": key}).Decode(&data)
-			if err != nil {
-				panic(err)
-			} else {
-				fmt.Println(data["name"])
-			}
-
+		fmt.Println(res.InsertedID)
+	} else if r.Method == "GET" && len(val) >= 1 {
+		var data bson.M
+		err := collectionUsers.FindOne(ctx, bson.M{"id": val}).Decode(&data)
+		if err != nil {
+			panic(err)
+		} else {
+			fmt.Fprintln(w, data)
 		}
 	}
+	lock.Unlock()
 }
 func posts(w http.ResponseWriter, r *http.Request) {
-	ids, ok := r.URL.Query()["id"]
-	if !ok {
-		if r.Method == "POST" && ids == nil {
-			id := r.FormValue("id")
-			caption := r.FormValue("caption")
-			url := r.FormValue("url")
-			timestamp := r.FormValue("timestamp")
-			userId := r.FormValue("userId")
-			var document interface{}
-			document = bson.D{
-				{"id", id}, {"caption", caption}, {"url", url}, {"timestamp", timestamp}, {"userId", userId}}
+	lock.Lock()
+	var val string
+	para := r.URL.Path
+	if len(para) > 6 {
+		val = para[7:]
+	}
 
-			res, err := collectionPosts.InsertOne(ctx, document)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Println(res.InsertedID)
+	if r.Method == "POST" && val == "" {
+		id := r.FormValue("id")
+		caption := r.FormValue("caption")
+		url := r.FormValue("url")
+		timestamp := r.FormValue("timestamp")
+		userId := r.FormValue("userId")
+		var document interface{}
+		document = bson.D{
+			{"id", id}, {"caption", caption}, {"url", url}, {"timestamp", timestamp}, {"userId", userId}}
+
+		res, err := collectionPosts.InsertOne(ctx, document)
+		if err != nil {
+			panic(err)
 		}
-	} else {
-		if r.Method == "GET" && ids != nil {
-			key := ids[0]
-			var data bson.M
-			err := collectionPosts.FindOne(ctx, bson.M{"id": key}).Decode(&data)
-			if err != nil {
-				panic(err)
-			} else {
-				fmt.Println(data["caption"])
-			}
+		fmt.Println(res.InsertedID)
+	} else if r.Method == "GET" && len(val) >= 1 {
+
+		var data bson.M
+		err := collectionPosts.FindOne(ctx, bson.M{"id": val}).Decode(&data)
+		if err != nil {
+			panic(err)
+		} else {
+			fmt.Fprintln(w, data)
 		}
 	}
+	lock.Unlock()
 }
 func getAllPosts(w http.ResponseWriter, r *http.Request) {
-	ids, ok := r.URL.Query()["id"]
-	if ok && r.Method == "GET" && ids != nil {
-		key := ids[0]
+	lock.Lock()
+	var val string
+	para := r.URL.Path
+	if len(para) > 6 {
+		val = para[13:]
+		fmt.Println(val)
+	}
+	if r.Method == "GET" && val != "" {
+
 		var data []bson.M
-		cursor, err := collectionPosts.Find(ctx, bson.M{"userId": key})
+		cursor, err := collectionPosts.Find(ctx, bson.M{"userId": val})
 		if err != nil {
 			panic(err)
 		} else {
@@ -94,9 +104,10 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				panic(err)
 			}
-			fmt.Println(data)
+			fmt.Fprintln(w, data)
 		}
 	}
+	lock.Unlock()
 }
 func handleRequests() {
 	http.HandleFunc("/users/", homePage)
